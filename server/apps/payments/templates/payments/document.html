@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{% if mode == "receipt" %}Receipt {{ payment.receipt_number }}{% else %}Invoice {{ invoice.invoice_number }}{% endif %}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @page { size: A4; margin: 14mm; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; max-width: 800px; margin: 24px auto; padding: 0 16px; }
+  header { display: flex; justify-content: space-between; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px; }
+  h1 { margin: 0; font-size: 22px; } h2 { margin: 0; font-size: 20px; letter-spacing: 2px; text-align: right; }
+  .muted { color: #666; font-size: 13px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+  th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; }
+  th { background: #f3f3f3; } .num { text-align: right; }
+  .totals { margin-left: auto; width: 320px; margin-top: 12px; }
+  .totals td { border: 0; padding: 4px 8px; } .totals .grand td { border-top: 2px solid #1a1a1a; font-weight: bold; font-size: 16px; }
+  .stamp { display: inline-block; border: 3px solid #1b7f3b; color: #1b7f3b; padding: 4px 14px; font-weight: bold; transform: rotate(-6deg); margin-top: 10px; }
+  .print-btn { margin: 12px 0; padding: 8px 16px; }
+  @media print { .print-btn { display: none; } body { margin: 0; max-width: none; } }
+</style>
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+<header>
+  <div><h1>{{ shop.name }}</h1><div class="muted">{{ shop.address }}<br>{{ shop.phone }}</div></div>
+  <div>
+    <h2>{% if mode == "receipt" %}RECEIPT{% else %}INVOICE{% endif %}</h2>
+    <div class="muted" style="text-align:right">
+      {% if mode == "receipt" %}Receipt # {{ payment.receipt_number }}<br>Date: {{ payment.paid_at|date:"d M Y, H:i" }}<br>{% endif %}
+      Invoice # {{ invoice.invoice_number }}<br>Job card # {{ job.job_number }}<br>
+      {% if mode != "receipt" %}Issued: {{ invoice.issued_at|date:"d M Y" }}<br>Due: {{ invoice.due_date|date:"d M Y" }}{% endif %}
+    </div>
+  </div>
+</header>
+
+<div class="grid">
+  <div><strong>Billed to</strong><br>{{ customer.name }}<br>{{ customer.phone }}<br>{{ customer.address }}</div>
+  <div><strong>Vehicle</strong><br>{{ vehicle.make }} {{ vehicle.model }} ({{ vehicle.year }})<br>Plate: {{ vehicle.registration_number }}
+    {% if job.odometer_in %}<br>Odometer in: {{ job.odometer_in }} km{% endif %}</div>
+</div>
+
+{% if mode == "receipt" %}
+<table>
+  <tr><th>Payment received</th><th>Method</th><th>Reference</th><th class="num">Amount ({{ currency }})</th></tr>
+  <tr><td>For invoice {{ invoice.invoice_number }}</td><td>{{ payment.get_method_display }}</td><td>{{ payment.reference|default:"-" }}</td><td class="num">{{ payment.amount|floatformat:2 }}</td></tr>
+</table>
+<table class="totals">
+  <tr><td>Invoice total</td><td class="num">{{ invoice.total|floatformat:2 }}</td></tr>
+  <tr><td>Total paid to date</td><td class="num">{{ invoice.amount_paid|floatformat:2 }}</td></tr>
+  <tr class="grand"><td>Balance due</td><td class="num">{{ invoice.balance_due|floatformat:2 }}</td></tr>
+</table>
+{% if invoice.status == "PAID" %}<div class="stamp">PAID IN FULL</div>{% endif %}
+{% else %}
+<table>
+  <thead><tr><th>Description</th><th>Type</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr></thead>
+  <tbody>
+  {% for item in items %}
+    <tr><td>{{ item.description }}</td><td>{{ item.type }}</td><td class="num">{{ item.quantity|floatformat:"-2" }}</td>
+        <td class="num">{{ item.unit_price|floatformat:2 }}</td><td class="num">{{ item.line_total|floatformat:2 }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<table class="totals">
+  <tr><td>Subtotal</td><td class="num">{{ invoice.subtotal|floatformat:2 }}</td></tr>
+  {% if invoice.discount %}<tr><td>Discount</td><td class="num">- {{ invoice.discount|floatformat:2 }}</td></tr>{% endif %}
+  {% if invoice.tax_percent %}<tr><td>Tax ({{ invoice.tax_percent|floatformat:"-2" }}%)</td><td class="num">{{ invoice.tax_amount|floatformat:2 }}</td></tr>{% endif %}
+  <tr class="grand"><td>Total ({{ currency }})</td><td class="num">{{ invoice.total|floatformat:2 }}</td></tr>
+  <tr><td>Paid</td><td class="num">{{ invoice.amount_paid|floatformat:2 }}</td></tr>
+  <tr><td>Balance due</td><td class="num">{{ invoice.balance_due|floatformat:2 }}</td></tr>
+</table>
+{% if invoice.status == "PAID" %}<div class="stamp">PAID</div>{% endif %}
+{% if payments %}
+<p class="muted" style="margin-top:18px">Payments received:
+{% for p in payments %}{{ p.receipt_number }} ({{ p.amount|floatformat:2 }}){% if not forloop.last %}, {% endif %}{% endfor %}</p>
+{% endif %}
+{% endif %}
+
+<p class="muted" style="margin-top:30px">Thank you for choosing {{ shop.name }}. This is a computer-generated document.</p>
+</body>
+</html>
